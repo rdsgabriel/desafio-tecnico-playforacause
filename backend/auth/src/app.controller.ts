@@ -1,10 +1,20 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { User as UserModel } from '@prisma/client';
+import { PrismaService } from './prisma.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post('user')
   async signupUser(
@@ -18,6 +28,13 @@ export class AppController {
     return this.userService.createUser(userData);
   }
 
+  /*
+  @Get('allusers')
+    async getAllUsers(): Promise<UserModel[]> {
+      return this.prisma.user.findMany();
+  } só pra teste.
+  */
+
   @Post('login')
   async loginUser(
     @Body()
@@ -25,13 +42,20 @@ export class AppController {
       email: string;
       password: string;
     },
-  ): Promise<{ message: string }> {
+  ): Promise<{ message: string; userId?: number }> {
     const isAuthenticated = await this.userService.authenticateUser(loginData);
 
     if (isAuthenticated) {
-      return { message: 'Login successful' };
-    } else {
-      return { message: 'Invalid email or password' };
+      const user = await this.prisma.user.findUnique({
+        where: { email: loginData.email },
+      }); // pra retornar o id
+
+      return {
+        message: 'Login successful',
+        userId: user.id,
+      };
     }
+
+    throw new UnauthorizedException('Email or password invalid'); // tratamento de erro do nest
   }
 }
